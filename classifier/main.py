@@ -12,40 +12,56 @@ import pynput
 
 
 def get_files():
-    return glob.glob("../data/*")
+    return glob.glob('../data/*')
 
 
 def load_file(file):
-    df = pd.read_csv(open(file, 'r'), nrows=375, header=0, sep=';', names=["accelaration_aX_g", "accelaration_aY_g",
-                                                              "accelaration_aZ_g", "gyroscope_aX_mdps",
-                                                              "gyroscope_aY_mdps", "gyroscope_aZ_mdps"])
-    if df.shape[0] != 375:
-        print("Wrong format of file: ", file)
+    df = pd.read_csv(open(file, 'r'), header=0, sep=';', usecols=['time_ms', 'accelaration_aX_g', 'accelaration_aY_g',
+                                                              'accelaration_aZ_g', 'gyroscope_aX_mdps',
+                                                              'gyroscope_aY_mdps', 'gyroscope_aZ_mdps'])
+    # Resampling to 33hz for now
+    time = df['time_ms']
+    start = time[0]
+    end = start + 10 * 300  # 300 * 10 ms -> 3s
+    index = None
+    for i in range(10):  # Find closest time value
+        index = time.where(time == end).first_valid_index()
+        if index:
+            break
+        end += 1
+    if not index:
+        print('Wrong format of file: ', file)
         return None
+    df = df.head(index)
+    df['time_delta'] = pd.to_timedelta(df['time_ms'], 'ms')
+    df.index = df['time_delta']
+    df = df.resample('30ms').mean()
+    df.index = pd.RangeIndex(start=0, stop=100, step=1)
+    df.drop('time_ms', inplace=True, axis=1)
     return df.values
 
 
 def prepare_data(files):
     loaded = list()
     labels = list()
-    label_classes = tf.constant(["Move_1", "Move_2", "Move_3", "Move_4", "Move_5"])
+    label_classes = tf.constant(['Move_1', 'Move_2', 'Move_3', 'Move_4', 'Move_5'])
     for file in files:
         data = load_file(file)
         if data is None:
             continue
         loaded.append(data)
-        pattern = tf.constant(eval("file[8:14]"))
+        pattern = tf.constant(eval('file[8:14]'))
         for i in range(len(label_classes)):
             if re.match(pattern.numpy(), label_classes[i].numpy()):
                 labels.append(i)
     loaded = np.asarray(loaded)
-    print("Labels before categorical transformation: ", labels)
+    print('Labels before categorical transformation: ', labels)
     labels = np.asarray(labels).astype('float32')
     labels = tf.keras.utils.to_categorical(labels)
-    print("Dataset shape: ", loaded.shape, "Labels shape: ", labels.shape)
+    print('Dataset shape: ', loaded.shape, 'Labels shape: ', labels.shape)
     trainX, testX = np.array_split(loaded, 2)
     trainY, testY = np.array_split(labels, 2)
-    print("Number of sample in training dataset: ", len(trainX), " In testing dataset: ", len(testX))
+    print('Number of sample in training dataset: ', len(trainX), ' In testing dataset: ', len(testX))
     return trainX, trainY, testX, testY
 
 
@@ -70,6 +86,7 @@ def result(scores):
 
 
 def classify(repeats=5):
+    load_file('../data/Move_1_001.csv')
     dataset = get_files()
     trainX, trainY, testX, testY = prepare_data(dataset)
     scores = list()
@@ -79,7 +96,6 @@ def classify(repeats=5):
         print('>#%d: % .3f' % (i + 1, score))
         scores.append(score)
     result(scores)
-
 
 
 if __name__ == '__main__':
