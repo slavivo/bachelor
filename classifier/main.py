@@ -44,7 +44,11 @@ def load_file(file):
 def prepare_data(files):
     loaded = list()
     labels = list()
+<<<<<<< HEAD
     label_classes = tf.constant(['Move_1', 'Move_2', 'Move_3', 'Move_4', 'Move_5'])
+=======
+    label_classes = tf.constant(["Move_1", "Move_2", "Move_3", "Move_4", "Move_5"])
+>>>>>>> 21acec707cdceacc3e08bfebab1c626b0e3a34c1
     for file in files:
         data = load_file(file)
         if data is None:
