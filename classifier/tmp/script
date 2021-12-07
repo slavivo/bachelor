@@ -1,0 +1,10 @@
+#!/bin/bash
+
+declare -i y=1
+
+for f in $1/*; do
+  if ! grep -q .csv "$f"; then
+    mv "$f" "$1/Move_$2_00$y.csv"
+    y=$((y+1))
+  fi
+done

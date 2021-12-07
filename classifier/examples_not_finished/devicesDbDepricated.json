@@ -1,0 +1,56 @@
+{
+    "0024004d3038510839363731": {
+        "_id": 4,
+        "deviceTypeId": 9,
+        "deviceTypeName": "SmartAHRS",
+        "gitCommitId": "7e66b366fa5ce1025ac6a8e65da891add841a76f",
+        "labelTime": "2021/06/30, 13:46:49",
+        "projectName": "MIHRIL",
+        "uploadTime": "2021/06/30, 13:46:03"
+    },
+    "004a00223038511537353433": {
+        "_id": 5,
+        "deviceTypeId": 9,
+        "deviceTypeName": "SmartAHRS",
+        "gitCommitId": "7e66b366fa5ce1025ac6a8e65da891add841a76f",
+        "labelTime": "2021/06/30, 13:49:26",
+        "projectName": "MIHRIL",
+        "uploadTime": "2021/06/30, 13:48:43"
+    },
+    "200097e00b001df508016a7f": {
+        "_id": 3,
+        "deviceTypeId": 1,
+        "deviceTypeName": "ECGV3",
+        "gitCommitId": "ce0bfa7ef7c17006132c9f43ac289b0e8b2f2a99",
+        "labelTime": "2021/05/28, 15:15:19",
+        "projectName": "vRedCity",
+        "uploadTime": "2021/03/22, 13:09:33"
+    },
+    "200099e80b005ef5080238b2": {
+        "_id": 0,
+        "deviceTypeId": 6,
+        "deviceTypeName": "ECGV3",
+        "gitCommitId": "9b1d7269b7e32988c078ff8361f5e60f6bc90b27",
+        "labelTime": "2021/05/26, 16:26:14",
+        "projectName": "Hydronaut",
+        "uploadTime": "2021/04/17, 19:53:39"
+    },
+    "200099e80b0060f5080238b2": {
+        "_id": 2,
+        "deviceTypeId": 6,
+        "deviceTypeName": "ECGV3",
+        "gitCommitId": "9b1d7269b7e32988c078ff8361f5e60f6bc90b27",
+        "labelTime": "2021/05/26, 16:31:21",
+        "projectName": "Hydronaut",
+        "uploadTime": "2021/05/16, 14:30:28"
+    },
+    "200099e80b00f3f5080238b2": {
+        "_id": 1,
+        "deviceTypeId": 6,
+        "deviceTypeName": "ECGV3",
+        "gitCommitId": "9b1d7269b7e32988c078ff8361f5e60f6bc90b27",
+        "labelTime": "2021/05/26, 16:30:08",
+        "projectName": "Hydronaut",
+        "uploadTime": "2021/04/17, 19:56:55"
+    }
+}

@@ -1,0 +1,82 @@
+{
+    "0024004d3038510839363731": {
+        "deviceName": "0",
+        "deviceTypeId": 9,
+        "deviceTypeName": "SmartAHRS",
+        "gitCommitId": "7e66b366fa5ce1025ac6a8e65da891add841a76f",
+        "labelTime": "2021/06/30, 13:50:58",
+        "pkId": 1,
+        "projectName": "MIHRIL",
+        "uploadTime": "2021/06/30, 13:46:03"
+    },
+    "003200413138510632303530": {
+        "deviceName": "tenzometr34",
+        "deviceTypeId": 7,
+        "deviceTypeName": "BioAdc",
+        "gitCommitId": "1a2360f93e8891feac16f7760f8071293c2a6819",
+        "labelTime": "2021/10/18, 17:05:25",
+        "pkId": 6,
+        "projectName": "SiReFo-Fire",
+        "uploadTime": "2021/10/16, 15:57:22"
+    },
+    "003700263138511836323738": {
+        "deviceName": "tenzometr12",
+        "deviceTypeId": 7,
+        "deviceTypeName": "BioAdc",
+        "gitCommitId": "1a2360f93e8891feac16f7760f8071293c2a6819",
+        "labelTime": "2021/10/18, 17:04:52",
+        "pkId": 5,
+        "projectName": "SiReFo-Fire",
+        "uploadTime": "2021/10/16, 16:22:17"
+    },
+    "003c005b3138510c32303530": {
+        "deviceName": "tenzometr5",
+        "deviceTypeId": 7,
+        "deviceTypeName": "BioAdc",
+        "gitCommitId": "1a2360f93e8891feac16f7760f8071293c2a6819",
+        "labelTime": "2021/10/18, 17:05:49",
+        "pkId": 7,
+        "projectName": "SiReFo-Fire",
+        "uploadTime": "2021/10/16, 17:00:01"
+    },
+    "004a00223038511537353433": {
+        "deviceName": "ahrs0",
+        "deviceTypeId": 9,
+        "deviceTypeName": "SmartAHRSV1",
+        "gitCommitId": "7e66b366fa5ce1025ac6a8e65da891add841a76f",
+        "labelTime": "2021/10/01, 16:27:19",
+        "pkId": 4,
+        "projectName": "MIHRIL",
+        "uploadTime": "2021/06/30, 13:48:43"
+    },
+    "200060a00b002cf5080156d2": {
+        "deviceName": "0",
+        "deviceTypeId": 0,
+        "deviceTypeName": "EEGV1",
+        "gitCommitId": "2fe0c7ba2d12b27931e6472147ae9bc7d5906b18",
+        "labelTime": "2021/07/11, 16:33:18",
+        "pkId": 2,
+        "projectName": "ComSyMARSeS",
+        "uploadTime": "2021/07/11, 15:29:44"
+    },
+    "200095e00b004bf50801809e": {
+        "deviceName": "0",
+        "deviceTypeId": 8,
+        "deviceTypeName": "FastImu",
+        "gitCommitId": "7e66b366fa5ce1025ac6a8e65da891add841a76f",
+        "labelTime": "2021/09/08, 15:36:21",
+        "pkId": 4,
+        "projectName": "SiReFo-Fire",
+        "uploadTime": "2021/07/05, 18:07:46"
+    },
+    "20009a000b009df508023caa": {
+        "deviceName": "0",
+        "deviceTypeId": 12,
+        "deviceTypeName": "ECGV3.1",
+        "gitCommitId": "8297e7b70d10c72b7272e75301017c8c5bef0257",
+        "labelTime": "2021/07/15, 14:41:33",
+        "pkId": 3,
+        "projectName": "Hydronaut",
+        "uploadTime": "2021/07/15, 14:40:34"
+    }
+}
