@@ -39,7 +39,7 @@ def main(queue, event):
                 logger.write_queue(queue)
                 if(ss.script_stopped()):
                     logger.write_queue(queue)
-                    # logger.write_file(options.output_file_name)
+                    logger.write_file(options.output_file_name)
                     event.set()
                     ss.stop()
                     exit()
@@ -49,11 +49,12 @@ def main(queue, event):
                     sleep(1)
                     logger.flush()
                 if(event.is_set()):
+                    logger.write_file(options.output_file_name)
                     ss.stop()
                     exit()
         except KeyboardInterrupt:
             logger.write_queue(queue)
-            # logger.write_file(options.output_file_name)
+            logger.write_file(options.output_file_name)
             event.set()
             exit()
         except ModbusRequestFailedException:

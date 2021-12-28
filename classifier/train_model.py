@@ -54,7 +54,6 @@ def prepare_data(files):
     loaded = list()
     labels = list()
     label_classes = tf.constant(['Move_1', 'Move_2', 'Move_3', 'Move_4', 'Move_5'])
-    label_classes = tf.constant(["Move_1", "Move_2", "Move_3", "Move_4", "Move_5"])
     for file in files:
         data = load_file(file)
         if data is None:
@@ -91,7 +90,7 @@ def eval_model(trainX, trainY, testX, testY, test=True):
     if test:
         _, accuracy = model.evaluate(testX, testY, batch_size=batch_size, verbose=0)
     else:
-        pickle.dump(model, open('nn_model_pkl', 'wb'))
+        pickle.dump(model, open('nns_model_pkl', 'wb'))
     return accuracy
 
 
