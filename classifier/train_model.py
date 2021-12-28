@@ -8,16 +8,10 @@ from keras.layers import Dense
 from keras.layers import LSTM
 from keras.layers import Dropout
 import sys
-from threading import Thread, Event
-from queue import Queue
-from os import path, getcwd
-THIS_DIR = getcwd()
-MODBUS_API_DIR = path.abspath(path.join(THIS_DIR, 'modbus_api'))
-DEVICE_API_DIR = path.abspath(path.join(THIS_DIR, 'device_api'))
-sys.path.append(MODBUS_API_DIR)
-sys.path.append(DEVICE_API_DIR)
-import device_send
+import pickle
 pd.options.mode.chained_assignment = None
+import absl.logging
+absl.logging.set_verbosity(absl.logging.ERROR)
 
 def get_files():
     return glob.glob('../data/*')
@@ -80,44 +74,6 @@ def prepare_data(files):
     print('Number of sample in training dataset: ', len(trainX), ' In testing dataset: ', len(testX))
     return trainX, trainY, testX, testY
 
-
-def real_time_eval(model):
-    counter = 1
-    df = pd.DataFrame()
-    queue = Queue()
-    event = Event()
-    t = Thread(target=device_send.main, args=(queue, event))
-    t.start()
-    print('\n---Beginning real-time classfication---\n')
-    while(True):
-        try:
-            if not queue.empty():
-                df_tmp = queue.get()
-                df = df.append(df_tmp, ignore_index=True)
-                # print('Queue size:', queue.qsize())
-                # print('---Main thread df---\n', df.head(2), df.tail(2), '\n Shape:', df.shape[0])
-            if event.is_set() and queue.empty():
-                break
-            if df.shape[0] > 350:
-                df_tmp = df[['time_ms', 'accelaration_aX_g', 'accelaration_aY_g', 'accelaration_aZ_g', 'gyroscope_aX_mdps',
-                    'gyroscope_aY_mdps', 'gyroscope_aZ_mdps']]
-                df_tmp, index = resample(df_tmp)
-                if df_tmp.empty:
-                    print('Wrong format of input data from sensor.')
-                    continue
-                data = df_tmp.values
-                label = model.predict(np.array([data,]))[0]
-                print('>#%d: Possibility of labels: ' % counter)
-                for l in label:
-                    print('% .2f%%' % (l * 100))
-                print(' Predicted label: %d' % (np.argmax(label) + 1))
-                counter += 1
-                df = df.iloc[index:]
-        except KeyboardInterrupt:
-            event.set()
-            t.join()
-            exit()
-
 def eval_model(trainX, trainY, testX, testY, test=True):
     if not test:
         trainX = np.concatenate((trainX, testX))
@@ -135,7 +91,7 @@ def eval_model(trainX, trainY, testX, testY, test=True):
     if test:
         _, accuracy = model.evaluate(testX, testY, batch_size=batch_size, verbose=0)
     else:
-        real_time_eval(model)
+        pickle.dump(model, open('nn_model_pkl', 'wb'))
     return accuracy
 
 
@@ -145,19 +101,23 @@ def result(scores):
     print('Accuracy: %.3f%% (+/-%.3f)' % (m, s))
 
 
-def classify(repeats=5):
+def train(repeats=5):
     # load_file('../data/Move_1_001.csv')
     dataset = get_files()
     trainX, trainY, testX, testY = prepare_data(dataset)
     scores = list()
     if len(sys.argv) == 1:
+        _ = eval_model(trainX, trainY, testX, testY, False)
+    elif str(sys.argv[1]) == 't':
         for i in tf.range(repeats):
             score = eval_model(trainX, trainY, testX, testY)
             score = score * 100.0
             print('>#%d: % .3f' % (i + 1, score))
             scores.append(score)
         result(scores)
-    elif str(sys.argv[1]) == 'rt':
-        _ = eval_model(trainX, trainY, testX, testY, False)
     else:
-        print('Wrong arguments passed. Pass "rt" to initiate real-time classification.')
+        print('Wrong arguments passed. Pass "t" to initiate testing of accuracy or no args to train and save the model.')
+
+
+if __name__ == '__main__':
+    train()
