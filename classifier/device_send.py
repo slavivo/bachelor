@@ -43,10 +43,11 @@ def main(queue, event):
                     event.set()
                     ss.stop()
                     exit()
-                if(queue.qsize() > 10):
+                if(queue.qsize() > 15):
                     logger.write_queue(queue)
                     print("Classification is behind data collection. Waiting 1s.")
                     sleep(1)
+                    logger.flush()
                 if(event.is_set()):
                     ss.stop()
                     exit()

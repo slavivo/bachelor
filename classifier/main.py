@@ -39,8 +39,8 @@ def resample(df):
     df_tmp = df.head(index)
     df_tmp['time_delta'] = pd.to_timedelta(df_tmp['time_ms'], 'ms')
     df_tmp.index = df_tmp['time_delta']
-    df_tmp = df_tmp.resample('30ms').mean()
-    df_tmp.index = pd.RangeIndex(start=0, stop=100, step=1)
+    df_tmp = df_tmp.resample('10ms').mean()
+    df_tmp.index = pd.RangeIndex(start=0, stop=300, step=1)
     df_tmp.drop('time_ms', inplace=True, axis=1)
     return df_tmp, index
 
