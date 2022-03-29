@@ -1,17 +1,29 @@
 import glob
+from unicodedata import bidirectional
 import numpy as np
 import tensorflow as tf
 import pandas as pd
 import re
 from keras.models import Sequential
+from keras.models import Model
+from keras.models import Input
 from keras.layers import Dense
 from keras.layers import LSTM
 from keras.layers import Dropout
+from keras.layers import Conv1D
+from keras.layers import MaxPooling1D
+from keras.layers import Flatten
+from keras.layers import Bidirectional
+from keras.layers import RepeatVector
+from keras.layers import TimeDistributed
+from keras import callbacks
 from scipy.spatial import distance
 from sklearn.metrics import accuracy_score
 from sklearn_extra.cluster import KMedoids
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
 from minisom import MiniSom
 import sys
 import pickle
@@ -39,8 +51,8 @@ def resample(df):
     df_tmp = df.head(index)
     df_tmp['time_delta'] = pd.to_timedelta(df_tmp['time_ms'], 'ms')
     df_tmp.index = df_tmp['time_delta']
-    df_tmp = df_tmp.resample('600ms').mean()
-    df_tmp.index = pd.RangeIndex(start=0, stop=5, step=1)
+    df_tmp = df_tmp.resample('100ms').mean()
+    df_tmp.index = pd.RangeIndex(start=0, stop=30, step=1)
     df_tmp.drop('time_ms', inplace=True, axis=1)
     return df_tmp, index
 
@@ -59,7 +71,7 @@ def load_file(file):
 def prepare_data(files):
     loaded = list()
     labels = list()
-    label_classes = tf.constant(['Move_1', 'Move_2', 'Move_3', 'Move_4', 'Move_5'])
+    label_classes = tf.constant(['Move_1', 'Move_2', 'Move_3', 'Move_4', 'Move_5', 'Move_6'])
     for file in files:
         data = load_file(file)
         if data is None:
@@ -74,8 +86,14 @@ def prepare_data(files):
     labels = np.asarray(labels).astype('float32')
     labels = tf.keras.utils.to_categorical(labels)
     print('Dataset shape: ', loaded.shape, 'Labels shape: ', labels.shape)
-    trainX, testX = np.array_split(loaded, 2)
-    trainY, testY = np.array_split(labels, 2)
+    trainX, testX, trainY, testY = train_test_split(loaded, labels, test_size=0.25, random_state=40)
+    scalers = {}
+    for i in range(trainX.shape[2]):
+        scalers[i] = StandardScaler()
+        trainX[:, :, i] = scalers[i].fit_transform(trainX[:, :, i])
+    for i in range(testX.shape[2]):
+        testX[:, :, i] = scalers[i].transform(testX[:, :, i])
+
     print('Number of sample in training dataset: ', len(trainX), ' In testing dataset: ', len(testX))
     return trainX, trainY, testX, testY
 
@@ -97,31 +115,50 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
     if not test:
         trainX = np.concatenate((trainX, testX))
         trainY = np.concatenate((trainY, testY))
+    trainX, valX, trainY, valY = train_test_split(trainX, trainY, test_size=0.25, random_state=40)
     n_timesteps, n_features, n_outputs = trainX.shape[1], trainX.shape[2], trainY.shape[1]
     accuracy = 0
     if type == 's':
-        model = tf.keras.models.Sequential()
-        model.add(LSTM(100, input_shape=(n_timesteps, n_features)))
+        # model = tf.keras.models.Sequential()
+        # model.add(LSTM(100, input_shape=(n_timesteps, n_features)))
+        # model.add(Dropout(0.5))
+        # model.add(Dense(100, activation='relu'))
+        # model.add(Dense(n_outputs, activation='softmax'))
+
+        # model = Sequential()
+        # model.add(Conv1D(filters=32, kernel_size=3, input_shape=(n_timesteps,n_features)))
+        # model.add(Dropout(0.5))
+        # model.add(Conv1D(filters=64, kernel_size=3, input_shape=(n_timesteps,n_features)))
+        # model.add(Dropout(0.5))
+        # model.add(Dense(1024, activation='relu'))
+        # model.add(Dropout(0.5))
+        # model.add(Flatten())
+        # model.add(Dense(n_outputs, activation='softmax'))
+
+        model = Sequential()
+        model.add(Bidirectional(LSTM(100, input_shape=(n_timesteps, n_features))))
         model.add(Dropout(0.5))
         model.add(Dense(100, activation='relu'))
         model.add(Dense(n_outputs, activation='softmax'))
+
         model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-        verbose, epochs, batch_size = 0, 15, 64
-        model.fit(trainX, trainY, epochs=epochs, batch_size=batch_size, verbose=verbose)
+        earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=5, restore_best_weights=True)
+        verbose, epochs, batch_size = 1, 50, 32
+        history = model.fit(trainX, trainY, epochs=epochs, batch_size=batch_size, verbose=verbose, validation_data=(valX, valY), callbacks=[earlystopping])
         if test:
             _, accuracy = model.evaluate(testX, testY, batch_size=batch_size, verbose=0)
         else:
             pickle.dump(model, open('nns_model_pkl', 'wb'))
     if type == 'k':
         # model= KMeans(n_clusters=5)
-        model = KMedoids(n_clusters=5, metric=DTW)
+        model = KMedoids(n_clusters=6, metric=DTW)
         samples, x , y = trainX.shape
         d2_trainX = trainX.reshape((samples, x * y))
         d2_testX = testX.reshape((samples, x * y))
         scaler = MinMaxScaler(feature_range=(0,1))
         d2_trainX = scaler.fit_transform(d2_trainX)
         d2_testX = scaler.transform(d2_testX)
-        model.fit(d2_trainX, trainY)
+        model.fit(d2_trainX)
         if test:
             predY = model.predict(d2_testX)
             roundedY = np.argmax(testY, axis=1)
@@ -129,13 +166,29 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
         else:
             pickle.dump(model, open('nns_model_pkl', 'wb'))
     if type == 'u':
-        model = MiniSom(x=10, y=10, input_len=1800, sigma=0.5, learning_rate=0.5)
-        samples, x , y = trainX.shape
-        d2_trainX = trainX.reshape((samples, x * y))
-        d2_testX = testX.reshape((samples, x * y))
-        model.random_weights_init(d2_trainX)
-        model.train_random(d2_trainX, 500)
-        print('hello')
+        model = Sequential()
+        model.add(LSTM(100, input_shape=(n_timesteps, n_features)))
+        model.add(Dropout(0.5))
+        model.add(RepeatVector(n_timesteps))
+        model.add(LSTM(100, return_sequences=True))
+        model.add(Dropout(0.5))
+        model.add(TimeDistributed(Dense(n_features)))
+
+        model.compile(loss='mae', optimizer='adam', metrics=['accuracy'])
+        earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=5, restore_best_weights=True)
+        verbose, epochs, batch_size = 1, 50, 32
+        model.fit(trainX, trainX, epochs=epochs, batch_size=batch_size, verbose=verbose, validation_data=(valX, valX), callbacks=[earlystopping])
+        model_output = Dense(n_outputs, activation='relu')(model.layers[0].output)
+        model = Model(model.inputs, model_output)
+
+        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+        earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=10, restore_best_weights=True)
+        verbose, epochs, batch_size = 1, 50, 32
+        history = model.fit(trainX, trainY, epochs=epochs, batch_size=batch_size, verbose=verbose, validation_data=(valX, valY), callbacks=[earlystopping])
+        if test:
+            _, accuracy = model.evaluate(testX, testY, batch_size=batch_size, verbose=0)
+        else:
+            pickle.dump(model, open('nns_model_pkl', 'wb'))
     return accuracy
 
 
