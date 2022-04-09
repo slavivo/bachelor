@@ -1,31 +1,24 @@
+from collections import Counter
 import glob
-from unicodedata import bidirectional
 import numpy as np
 import tensorflow as tf
 import pandas as pd
 import re
 from keras.models import Sequential
 from keras.models import Model
-from keras.models import Input
 from keras.layers import Dense
 from keras.layers import LSTM
 from keras.layers import Dropout
-from keras.layers import Conv1D
-from keras.layers import MaxPooling1D
-from keras.layers import Flatten
 from keras.layers import Bidirectional
 from keras.layers import RepeatVector
 from keras.layers import TimeDistributed
 from keras import callbacks
 from scipy.spatial import distance
-from sklearn.metrics import accuracy_score
 from sklearn_extra.cluster import KMedoids
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import normalize
 from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
-from minisom import MiniSom
+from yellowbrick.cluster import KElbowVisualizer
+import matplotlib.pyplot as plt
 import sys
 import pickle
 pd.options.mode.chained_assignment = None
@@ -52,8 +45,8 @@ def resample(df):
     df_tmp = df.head(index)
     df_tmp['time_delta'] = pd.to_timedelta(df_tmp['time_ms'], 'ms')
     df_tmp.index = df_tmp['time_delta']
-    df_tmp = df_tmp.resample('100ms').mean()
-    df_tmp.index = pd.RangeIndex(start=0, stop=30, step=1)
+    df_tmp = df_tmp.resample('500ms').mean()
+    df_tmp.index = pd.RangeIndex(start=0, stop=6, step=1)
     df_tmp.drop('time_ms', inplace=True, axis=1)
     return df_tmp, index
 
@@ -173,7 +166,6 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
         testX, valX, testY, valY = train_test_split(testX, testY, test_size=0.25)
         print('Number of sample in training dataset: ', len(trainX), ' In validation dataset: ', len(valX), ' In testing dataset: ', len(testX))
     
-    n_timesteps, n_features, n_outputs = trainX.shape[1], trainX.shape[2], trainY.shape[1]
     accuracy = 0
 
     if type == 's':
@@ -194,12 +186,31 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
         model = KMedoids(n_clusters=6, metric=DTW)
         samples, x , y = trainX.shape
         d2_trainX = trainX.reshape((samples, x * y))
+        samples, x , y = testX.shape        
         d2_testX = testX.reshape((samples, x * y))
+        # visualizer = KElbowVisualizer(model, k=(1,10))
+        # visualizer.fit(d2_trainX)
+        # visualizer.show()
         model.fit(d2_trainX)
+        cluster_distribution = {i: [] for i in range(6)}
         if test:
             predY = model.predict(d2_testX)
             roundedY = np.argmax(testY, axis=1)
-            accuracy = accuracy_score(roundedY, predY)
+            print(predY)
+            print(roundedY)
+            for i in range(len(predY)):
+                cluster_distribution[predY[i]].append(roundedY[i])
+            print(cluster_distribution)
+            fig, axes = plt.subplots(6)
+            # fig.suptitle('Clouster label distribution')
+            for i in range(6):
+                counted = Counter(cluster_distribution[i])
+                key_list = list(counted.keys())
+                val_list = list(counted.values())
+                axes[i].pie(val_list, labels=key_list, startangle=90, radius=1800)
+                axes[i].set_title('Distribution of cluster ' + str(i + 1), fontsize=12)
+                axes[i].axis('equal')
+            plt.show()
         else:
             pickle.dump(model, open('nns_model_pkl', 'wb'))
 
