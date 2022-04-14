@@ -45,8 +45,8 @@ def resample(df):
     df_tmp = df.head(index)
     df_tmp['time_delta'] = pd.to_timedelta(df_tmp['time_ms'], 'ms')
     df_tmp.index = df_tmp['time_delta']
-    df_tmp = df_tmp.resample('500ms').mean()
-    df_tmp.index = pd.RangeIndex(start=0, stop=6, step=1)
+    df_tmp = df_tmp.resample('1000ms').mean()
+    df_tmp.index = pd.RangeIndex(start=0, stop=3, step=1)
     df_tmp.drop('time_ms', inplace=True, axis=1)
     return df_tmp, index
 
@@ -137,13 +137,13 @@ def unsupervised_lstm_autoencoder(trainX, trainY, valX, valY):
     model.add(LSTM(100, return_sequences=True))
     model.add(Dropout(0.5))
     model.add(TimeDistributed(Dense(n_features)))
-    model.compile(loss='mae', optimizer='adam', metrics=['accuracy'])
+    model.compile(loss='mae', optimizer='adam')
 
     earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=10, restore_best_weights=True)
     verbose, epochs, batch_size = 0, 500, 32
     model.fit(trainX, trainX, epochs=epochs, batch_size=batch_size, verbose=verbose, validation_data=(valX, valX), callbacks=[earlystopping])
 
-    model_output = Dense(n_outputs, activation='relu')(model.layers[0].output)
+    model_output = Dense(n_outputs, activation='softmax')(model.layers[0].output)
     model = Model(inputs=model.inputs, outputs=model_output)
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
@@ -208,7 +208,7 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
                 key_list = list(counted.keys())
                 val_list = list(counted.values())
                 axes[i].pie(val_list, labels=key_list, startangle=90, radius=1800)
-                axes[i].set_title('Distribution of cluster ' + str(i + 1), fontsize=12)
+                axes[i].set_title('Distribution of cluster ' + str  (i + 1), fontsize=12)
                 axes[i].axis('equal')
             plt.show()
         else:
