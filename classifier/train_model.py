@@ -14,6 +14,7 @@ from keras.layers import RepeatVector
 from keras.layers import TimeDistributed
 from keras import callbacks
 from scipy.spatial import distance
+from sklearn.metrics.cluster import completeness_score
 from sklearn_extra.cluster import KMedoids
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
@@ -54,12 +55,14 @@ def resample(df):
 def load_file(file):
     df = pd.read_csv(open(file, 'r'), header=0, sep=';', usecols=['time_ms', 'accelaration_aX_g', 'accelaration_aY_g',
                                                                   'accelaration_aZ_g', 'gyroscope_aX_mdps',
-                                                                  'gyroscope_aY_mdps', 'gyroscope_aZ_mdps'])
+                                                                  'gyroscope_aY_mdps', 'gyroscope_aZ_mdps',
+                                                                  'magnetometer_aX_mT', 'magnetometer_aY_mT',
+                                                                  'magnetometer_aZ_mT'])
     df, _ = resample(df)
     if df.empty:
         print('Wrong format of file: ', file)
         return None
-    return df.values
+    return df.to_numpy()
 
 
 def flatten(x):
@@ -158,6 +161,8 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
         scaler = StandardScaler().fit(flatten(trainX))
         trainX = scale(trainX, scaler)
         testX = scale(testX, scaler)
+        if not test:
+            pickle.dump(scaler, open('scaler_pkl', 'wb'))
     if not test:
         trainX = np.concatenate((trainX, testX))
         trainY = np.concatenate((trainY, testY))
@@ -180,7 +185,7 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
         if test:
             _, accuracy = model.evaluate(testX, testY, batch_size=batch_size, verbose=0)
         else:
-            pickle.dump(model, open('nns_model_pkl', 'wb'))
+            pickle.dump(model, open('nnu_model_pkl', 'wb'))
 
     if type == 'k':
         model = KMedoids(n_clusters=6, metric=DTW)
@@ -193,26 +198,33 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
         # visualizer.show()
         model.fit(d2_trainX)
         cluster_distribution = {i: [] for i in range(6)}
+        cluster_labels = []
+        predY = model.predict(d2_testX)
+        roundedY = np.argmax(testY, axis=1)
+        for i in range(len(predY)):
+            cluster_distribution[predY[i]].append(roundedY[i])
         if test:
-            predY = model.predict(d2_testX)
-            roundedY = np.argmax(testY, axis=1)
-            print(predY)
-            print(roundedY)
-            for i in range(len(predY)):
-                cluster_distribution[predY[i]].append(roundedY[i])
             print(cluster_distribution)
             fig, axes = plt.subplots(6)
-            # fig.suptitle('Clouster label distribution')
-            for i in range(6):
-                counted = Counter(cluster_distribution[i])
+            print('Completeness score: %.3f' % completeness_score(roundedY, predY))
+            print(predY)
+            print(roundedY)
+        # fig.suptitle('Clouster label distribution')
+        for i in range(6):
+            counted = Counter(cluster_distribution[i])
+            cluster_labels.append(counted.most_common(1)[0][0])
+            if test:
                 key_list = list(counted.keys())
                 val_list = list(counted.values())
                 axes[i].pie(val_list, labels=key_list, startangle=90, radius=1800)
                 axes[i].set_title('Distribution of cluster ' + str  (i + 1), fontsize=12)
                 axes[i].axis('equal')
+        print(cluster_labels)
+        if test:
             plt.show()
         else:
-            pickle.dump(model, open('nns_model_pkl', 'wb'))
+            pickle.dump(model, open('km_model_pkl', 'wb'))
+            pickle.dump(cluster_labels, open('km_labels_pkl', 'wb'))
 
     return accuracy
 
