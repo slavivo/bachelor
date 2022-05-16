@@ -13,7 +13,6 @@ from keras.layers import Bidirectional
 from keras.layers import RepeatVector
 from keras.layers import TimeDistributed
 from keras import callbacks
-from scipy.spatial import distance
 from sklearn.metrics.cluster import completeness_score
 from sklearn_extra.cluster import KMedoids
 from sklearn.preprocessing import StandardScaler
@@ -25,31 +24,10 @@ import pickle
 pd.options.mode.chained_assignment = None
 import absl.logging
 absl.logging.set_verbosity(absl.logging.ERROR)
+import functions
 
 def get_files():
     return glob.glob('../data/*')
-
-
-def resample(df):
-    # Resampling to 33hz for now
-    time = df['time_ms']
-    start = time[0]
-    end = start + 10 * 300  # 300 * 10 ms -> 3s
-    index = None
-    for i in range(10):  # Find closest time value
-        index = time.where(time == end).first_valid_index()
-        if index:
-            break
-        end += 1
-    if not index:
-        return pd.DataFrame(), 0
-    df_tmp = df.head(index)
-    df_tmp['time_delta'] = pd.to_timedelta(df_tmp['time_ms'], 'ms')
-    df_tmp.index = df_tmp['time_delta']
-    df_tmp = df_tmp.resample('1000ms').mean()
-    df_tmp.index = pd.RangeIndex(start=0, stop=3, step=1)
-    df_tmp.drop('time_ms', inplace=True, axis=1)
-    return df_tmp, index
 
 
 def load_file(file):
@@ -58,7 +36,7 @@ def load_file(file):
                                                                   'gyroscope_aY_mdps', 'gyroscope_aZ_mdps',
                                                                   'magnetometer_aX_mT', 'magnetometer_aY_mT',
                                                                   'magnetometer_aZ_mT'])
-    df, _ = resample(df)
+    df, _ = functions.resample(df)
     if df.empty:
         print('Wrong format of file: ', file)
         return None
@@ -70,12 +48,6 @@ def flatten(x):
     for i in range(x.shape[0]):
         flatX[i] = x[i, x.shape[1] - 1, :]
     return flatX
-
-
-def scale(x, scaler):
-    for i in range(x.shape[0]):
-        x[i, :, :] = scaler.transform(x[i, :, :])
-    return x
 
 
 def prepare_data(files):
@@ -98,20 +70,6 @@ def prepare_data(files):
     print('Dataset shape: ', loaded.shape, 'Labels shape: ', labels.shape)
     trainX, testX, trainY, testY = train_test_split(loaded, labels, test_size=0.5, random_state=40)   
     return trainX, trainY, testX, testY
-
-def DTW(a, b):
-    an = a.size
-    bn = b.size
-    pointwise_distance = distance.cdist(a.reshape(-1,1),b.reshape(-1,1))
-    cumdist = np.matrix(np.ones((an+1,bn+1)) * np.inf)
-    cumdist[0,0] = 0
-    for ai in range(an):
-        for bi in range(bn):
-            minimum_cost = np.min([cumdist[ai, bi+1],
-                                   cumdist[ai+1, bi],
-                                   cumdist[ai, bi]])
-            cumdist[ai+1, bi+1] = pointwise_distance[ai,bi] + minimum_cost
-    return cumdist[an, bn]
 
 
 def supervised_lstm(trainX, trainY, valX, valY):
@@ -159,8 +117,8 @@ def unsupervised_lstm_autoencoder(trainX, trainY, valX, valY):
 def eval_model(type, trainX, trainY, testX, testY, test=True):
     if type != 's':
         scaler = StandardScaler().fit(flatten(trainX))
-        trainX = scale(trainX, scaler)
-        testX = scale(testX, scaler)
+        trainX = functions.scale(trainX, scaler)
+        testX = functions.scale(testX, scaler)
         if not test:
             pickle.dump(scaler, open('scaler_pkl', 'wb'))
     if not test:
@@ -188,7 +146,7 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
             pickle.dump(model, open('nnu_model_pkl', 'wb'))
 
     if type == 'k':
-        model = KMedoids(n_clusters=6, metric=DTW)
+        model = KMedoids(n_clusters=6, metric=functions.DTW)
         samples, x , y = trainX.shape
         d2_trainX = trainX.reshape((samples, x * y))
         samples, x , y = testX.shape        
