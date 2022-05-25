@@ -5,9 +5,10 @@ from scipy.spatial import distance
 
 def resample(df):
     # Default is 10hz
+    duration = 4 # duration of the sample in seconds
     time = df['time_ms']
     start = time[0]
-    end = start + 10 * 300  # 300 * 10 ms -> 3s
+    end = start + 1000 * duration
     index = None
     for i in range(10):  # Find closest time value
         index = time.where(time == end).first_valid_index()
@@ -17,10 +18,13 @@ def resample(df):
     if not index:
         return pd.DataFrame(), 0
     df_tmp = df.head(index)
-    df_tmp['time_delta'] = pd.to_timedelta(df_tmp['time_ms'], 'ms')
-    df_tmp.index = df_tmp['time_delta']
-    df_tmp = df_tmp.resample('1000ms').mean()
-    df_tmp.index = pd.RangeIndex(start=0, stop=3, step=1)
+    df_tmp.index = df_tmp['time_ms'].astype('datetime64[ms]')
+    df_tmp = df_tmp.resample('1ms').last()
+    df_tmp = df_tmp.interpolate() # linear interpolation
+    df_tmp = df_tmp.resample('100ms').mean()
+    if df_tmp.shape[0] == duration * 10 + 1:
+        df_tmp = df_tmp.iloc[1:]
+    df_tmp.index = pd.RangeIndex(start=0, stop=duration*10, step=1)
     df_tmp.drop('time_ms', inplace=True, axis=1)
     return df_tmp, index
 

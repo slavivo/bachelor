@@ -36,6 +36,9 @@ def load_file(file):
                                                                   'gyroscope_aY_mdps', 'gyroscope_aZ_mdps',
                                                                   'magnetometer_aX_mT', 'magnetometer_aY_mT',
                                                                   'magnetometer_aZ_mT'])
+    N = int(df.shape[0] / 2)
+    df = df.iloc[N:]
+    df = df.reset_index(drop=True)
     df, _ = functions.resample(df)
     if df.empty:
         print('Wrong format of file: ', file)
@@ -53,7 +56,7 @@ def flatten(x):
 def prepare_data(files):
     loaded = list()
     labels = list()
-    label_classes = tf.constant(['Move_1', 'Move_2', 'Move_3', 'Move_4', 'Move_5', 'Move_6'])
+    label_classes = tf.constant(['Move_1', 'Move_2', 'Move_3', 'Move_4', 'Move_5', 'Move_6', 'Move_7', 'Move_8', 'Move_9'])
     for file in files:
         data = load_file(file)
         if data is None:
@@ -83,7 +86,7 @@ def supervised_lstm(trainX, trainY, valX, valY):
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
     earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=10, restore_best_weights=True)
-    verbose, epochs, batch_size = 1, 50, 32
+    verbose, epochs, batch_size = 0, 150, 32
     history = model.fit(trainX, trainY, epochs=epochs, batch_size=batch_size, verbose=verbose, validation_data=(valX, valY), callbacks=[earlystopping])
     return model, batch_size
 
@@ -134,6 +137,12 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
     if type == 's':
         model, batch_size = supervised_lstm(trainX, trainY, valX, valY)
         if test:
+            pred = model.predict(testX, batch_size=batch_size, verbose=0)
+            tmp1 = testY.argmax(axis=1) + 1
+            tmp2 = pred.argmax(axis=1) + 1
+            for i in range(len(tmp1)):
+                if tmp1[i] != tmp2[i]:
+                    print(str(tmp1[i]) + ' - ' + str(tmp2[i]))
             _, accuracy = model.evaluate(testX, testY, batch_size=batch_size, verbose=0)
         else:
             pickle.dump(model, open('nns_model_pkl', 'wb'))
@@ -146,7 +155,8 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
             pickle.dump(model, open('nnu_model_pkl', 'wb'))
 
     if type == 'k':
-        model = KMedoids(n_clusters=6, metric=functions.DTW)
+        cluster_amount = 9
+        model = KMedoids(n_clusters=cluster_amount, metric=functions.DTW)
         samples, x , y = trainX.shape
         d2_trainX = trainX.reshape((samples, x * y))
         samples, x , y = testX.shape        
@@ -155,7 +165,7 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
         # visualizer.fit(d2_trainX)
         # visualizer.show()
         model.fit(d2_trainX)
-        cluster_distribution = {i: [] for i in range(6)}
+        cluster_distribution = {i: [] for i in range(cluster_amount)}
         cluster_labels = []
         predY = model.predict(d2_testX)
         roundedY = np.argmax(testY, axis=1)
@@ -163,19 +173,19 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
             cluster_distribution[predY[i]].append(roundedY[i])
         if test:
             print(cluster_distribution)
-            fig, axes = plt.subplots(6)
+            fig, axes = plt.subplots(cluster_amount)
             print('Completeness score: %.3f' % completeness_score(roundedY, predY))
             print(predY)
             print(roundedY)
         # fig.suptitle('Clouster label distribution')
-        for i in range(6):
+        for i in range(cluster_amount):
             counted = Counter(cluster_distribution[i])
             cluster_labels.append(counted.most_common(1)[0][0])
             if test:
                 key_list = list(counted.keys())
                 val_list = list(counted.values())
                 axes[i].pie(val_list, labels=key_list, startangle=90, radius=1800)
-                axes[i].set_title('Distribution of cluster ' + str  (i + 1), fontsize=12)
+                axes[i].set_title('Distribution of cluster ' + str(i + 1), fontsize=12)
                 axes[i].axis('equal')
         print(cluster_labels)
         if test:
@@ -193,7 +203,7 @@ def result(scores):
     print('Accuracy: %.3f%% (+/-%.3f)' % (m, s))
 
 
-def train(repeats=5):
+def train(repeats=10):
     # load_file('../data/Move_1_001.csv')
     dataset = get_files()
     trainX, trainY, testX, testY = prepare_data(dataset)
