@@ -1,11 +1,22 @@
+# === Contains various function used throughout project ===
+
 import numpy as np
 import pandas as pd
 from scipy.spatial import distance
 
 
 def resample(df):
-    # Default is 10hz
-    duration = 4 # duration of the sample in seconds
+    """**Cuts off first n seconds of dataframe and resamples it**
+    Parameters:
+
+    1. **df** - (dataframe) data of movement
+    
+    Returns:
+
+    1. **df_tmp** - (dataframe) new data of movement
+    2. **index** - (int) number of the line at which dataframe was cut off
+    """
+    duration = 5 # duration of the sample in seconds
     time = df['time_ms']
     start = time[0]
     end = start + 1000 * duration
@@ -30,12 +41,32 @@ def resample(df):
 
 
 def scale(x, scaler):
+    """**Standardizes 3D data**
+    Parameters:
+
+    1. **x** - (np array) 3D data to be standardized
+    2. **scaler** - Standardized scaler for 2D data
+    
+    Returns:
+    
+    1. **x** - (np array) standardized 3D data
+    """
     for i in range(x.shape[0]):
         x[i, :, :] = scaler.transform(x[i, :, :])
     return x
 
 
 def DTW(a, b):
+    """**Returns temporal distance of two vectors**
+    Parameters:
+
+    1. **a** - (np array) vector
+    2. **b** - (np array) vector
+    
+    Returns:
+    
+    1. **distance** - (np array) vector containing distance of a and b
+    """
     an = a.size
     bn = b.size
     pointwise_distance = distance.cdist(a.reshape(-1,1),b.reshape(-1,1))

@@ -1,3 +1,5 @@
+# === Creates and trains classification models ===
+
 from collections import Counter
 import glob
 import numpy as np
@@ -14,9 +16,13 @@ from keras.layers import RepeatVector
 from keras.layers import TimeDistributed
 from keras import callbacks
 from sklearn.metrics.cluster import completeness_score
+from sklearn.model_selection import GridSearchCV
 from sklearn_extra.cluster import KMedoids
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import ConfusionMatrixDisplay
+from yellowbrick.cluster import SilhouetteVisualizer
 from yellowbrick.cluster import KElbowVisualizer
 import matplotlib.pyplot as plt
 import sys
@@ -27,10 +33,21 @@ absl.logging.set_verbosity(absl.logging.ERROR)
 import functions
 
 def get_files():
+    """**Returns files from a specified directory**
+    """
     return glob.glob('../data/*')
 
 
 def load_file(file):
+    """**Reads one interval from a .csv file**
+    Parameters:
+
+    1. **file** - (str) path to file
+
+    Returns:
+
+    1. **array** - (np array) read interval
+    """
     df = pd.read_csv(open(file, 'r'), header=0, sep=';', usecols=['time_ms', 'accelaration_aX_g', 'accelaration_aY_g',
                                                                   'accelaration_aZ_g', 'gyroscope_aX_mdps',
                                                                   'gyroscope_aY_mdps', 'gyroscope_aZ_mdps',
@@ -47,13 +64,35 @@ def load_file(file):
 
 
 def flatten(x):
+    """**Flattens a 3D np array**
+    Parameters:
+
+    1. **x** - (np array) array to be flattened
+
+    Returns:
+
+    1. **flatX** - (np array) flattened array
+    """
     flatX = np.empty((x.shape[0], x.shape[2]))
     for i in range(x.shape[0]):
         flatX[i] = x[i, x.shape[1] - 1, :]
     return flatX
 
 
-def prepare_data(files):
+def prepare_data(files, i=1):
+    """**Reads and prepares data from files**
+    Parameters:
+
+    1. **files** - (list) list of files
+    2. **i** - (int) can be set to change random_state of train_test_split
+
+    Returns:
+
+    1. **trainX** - (np array) training dataset features
+    2. **trainY** - (np array) training dataset labels
+    3. **testX** - (np array) testing dataset features
+    4. **testY** - (np array) testing dataset labels
+    """
     loaded = list()
     labels = list()
     label_classes = tf.constant(['Move_1', 'Move_2', 'Move_3', 'Move_4', 'Move_5', 'Move_6', 'Move_7', 'Move_8', 'Move_9'])
@@ -67,67 +106,137 @@ def prepare_data(files):
             if re.match(pattern.numpy(), label_classes[i].numpy()):
                 labels.append(i)
     loaded = np.asarray(loaded)
-    print('Labels before categorical transformation: ', labels)
     labels = np.asarray(labels).astype('float32')
     labels = tf.keras.utils.to_categorical(labels)
-    print('Dataset shape: ', loaded.shape, 'Labels shape: ', labels.shape)
-    trainX, testX, trainY, testY = train_test_split(loaded, labels, test_size=0.5, random_state=40)   
+    trainX, testX, trainY, testY = train_test_split(loaded, labels, test_size=0.4, random_state=i*25)   
     return trainX, trainY, testX, testY
 
 
 def supervised_lstm(trainX, trainY, valX, valY):
+    """**Creates a BLSTM supervised neural network model**
+    Parameters:
+
+    1. **trainX** - (np array) training dataset features
+    2. **trainY** - (np array) training dataset labels
+    3. **valX** - (np array) validation dataset features
+    4. **valY** - (np array) validation dataset labels
+
+    Returns:
+
+    1. **model** - BLSTM NN
+    2. **batch_size** - batch size of the NN
+    """
     n_timesteps, n_features, n_outputs = trainX.shape[1], trainX.shape[2], trainY.shape[1]
 
     model = Sequential()
-    model.add(Bidirectional(LSTM(100, input_shape=(n_timesteps, n_features))))
+    model.add(Bidirectional(LSTM(units=100, input_shape=(n_timesteps, n_features), return_sequences=True)))
+    model.add(Bidirectional(LSTM(units=100, input_shape=(n_timesteps, n_features))))
     model.add(Dropout(0.5))
-    model.add(Dense(100, activation='tanh'))
+    model.add(Dense(units=100, activation='tanh'))
     model.add(Dense(n_outputs, activation='softmax'))
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
-    earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=10, restore_best_weights=True)
+    earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='auto', patience=20, restore_best_weights=True)
     verbose, epochs, batch_size = 0, 150, 32
     history = model.fit(trainX, trainY, epochs=epochs, batch_size=batch_size, verbose=verbose, validation_data=(valX, valY), callbacks=[earlystopping])
     return model, batch_size
 
 
 def unsupervised_lstm_autoencoder(trainX, trainY, valX, valY):
+    """**Creates a LSTM AE and then modifies it for classification**
+    Parameters:
+
+    1. **trainX** - (np array) training dataset features
+    2. **trainY** - (np array) training dataset labels
+    3. **valX** - (np array) validation dataset features
+    4. **valY** - (np array) validation dataset labels
+
+    Returns:
+
+    1. **model2** - LSTM AE usable for classification
+    2. **batch_size**  - batch size of the NN
+    """
     n_timesteps, n_features, n_outputs = trainX.shape[1], trainX.shape[2], trainY.shape[1]
 
     model = Sequential()
-    model.add(LSTM(100, input_shape=(n_timesteps, n_features)))
+    model.add(LSTM(units=250, input_shape=(n_timesteps, n_features), return_sequences=True))
+    model.add(LSTM(units=250, input_shape=(n_timesteps, n_features), return_sequences=True))
+    model.add(LSTM(units=250, input_shape=(n_timesteps, n_features)))
     model.add(Dropout(0.5))
     model.add(RepeatVector(n_timesteps))
-    model.add(LSTM(100, return_sequences=True))
+    model.add(LSTM(units=250, return_sequences=True))
+    model.add(LSTM(units=250, return_sequences=True))
+    model.add(LSTM(units=250, return_sequences=True))
     model.add(Dropout(0.5))
     model.add(TimeDistributed(Dense(n_features)))
     model.compile(loss='mae', optimizer='adam')
 
-    earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=10, restore_best_weights=True)
+    earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=20, restore_best_weights=True)
     verbose, epochs, batch_size = 0, 500, 32
     model.fit(trainX, trainX, epochs=epochs, batch_size=batch_size, verbose=verbose, validation_data=(valX, valX), callbacks=[earlystopping])
 
-    model_output = Dense(n_outputs, activation='softmax')(model.layers[0].output)
-    model = Model(inputs=model.inputs, outputs=model_output)
-    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    model2 = Sequential()
+    model2.add(LSTM(units=250, input_shape=(n_timesteps, n_features), return_sequences=True, weights=model.layers[0].get_weights()))
+    model2.add(LSTM(units=250, input_shape=(n_timesteps, n_features), return_sequences=True, weights=model.layers[1].get_weights()))
+    model2.add(LSTM(units=250, input_shape=(n_timesteps, n_features), weights=model.layers[2].get_weights()))
+    model2.add(Dense(n_outputs, activation='softmax'))
+    model2.layers[0].trainable = False
+    model2.layers[1].trainable = False
+    model2.layers[2].trainable = False
+    model2.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
-    earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=10, restore_best_weights=True)
+    earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=20, restore_best_weights=True)
     verbose, epochs, batch_size = 0, 500, 32
-    history = model.fit(trainX, trainY, epochs=epochs, batch_size=batch_size, verbose=verbose, validation_data=(valX, valY), callbacks=[earlystopping])
-    return model, batch_size
+    history = model2.fit(trainX, trainY, epochs=epochs, batch_size=batch_size, verbose=verbose, validation_data=(valX, valY), callbacks=[earlystopping])
+    return model2, batch_size
 
 
-def eval_model(type, trainX, trainY, testX, testY, test=True):
-    if type != 's':
-        scaler = StandardScaler().fit(flatten(trainX))
-        trainX = functions.scale(trainX, scaler)
-        testX = functions.scale(testX, scaler)
-        if not test:
-            pickle.dump(scaler, open('scaler_pkl', 'wb'))
+def kmeoids_dtw(d2_trainX):
+    """**Builds a kmedoids classificator**
+    Parameters:
+
+    1. **d2_trainX** - (np array) flattened 2D training dataset features
+
+    Returns:
+
+    1. **model** - classification model
+    2. **cluster_amount** - (int) amount of clusters
+    """
+    model = KMedoids(n_clusters=8, metric=functions.DTW, random_state=10)
+    
+    visualizer = KElbowVisualizer(model, k=(6,11), metric='calinski_harabasz', timings=False)
+    visualizer.fit(d2_trainX)
+    visualizer.show()
+    cluster_amount = visualizer.elbow_value_
+    model = KMedoids(n_clusters=cluster_amount, metric=functions.DTW, random_state=10)
+    model.fit(d2_trainX)
+    return model, cluster_amount
+
+
+def build_model(type, trainX, trainY, testX, testY, testmatrix=None, predmatrix=None, test=True):
+    """**Builds a specified model and then either tests it or saves it**
+    Parameters:
+
+    1. **type** - (str) type of model to be used
+    2. **trainX** - (np array) training dataset features
+    3. **trainY** - (np array) training dataset labels
+    4. **testX** - (np array) testing dataset features
+    5. **testY** - (np array) testing dataset labels
+    6. **test** - (bool) true if test is to be done
+
+    Returns:
+
+    1. **accuracy** - (float) accuracy of the classification
+    """
+    scaler = StandardScaler().fit(flatten(trainX))
+    trainX = functions.scale(trainX, scaler)
+    testX = functions.scale(testX, scaler)
+    if not test:
+        pickle.dump(scaler, open('scaler_pkl', 'wb'))
     if not test:
         trainX = np.concatenate((trainX, testX))
         trainY = np.concatenate((trainY, testY))
-        trainX, valX, trainY, valY = train_test_split(trainX, trainY, test_size=0.25)
+        trainX, valX, trainY, valY = train_test_split(trainX, trainY, test_size=0.3)
     else:
         testX, valX, testY, valY = train_test_split(testX, testY, test_size=0.25)
         print('Number of sample in training dataset: ', len(trainX), ' In validation dataset: ', len(valX), ' In testing dataset: ', len(testX))
@@ -137,12 +246,6 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
     if type == 's':
         model, batch_size = supervised_lstm(trainX, trainY, valX, valY)
         if test:
-            pred = model.predict(testX, batch_size=batch_size, verbose=0)
-            tmp1 = testY.argmax(axis=1) + 1
-            tmp2 = pred.argmax(axis=1) + 1
-            for i in range(len(tmp1)):
-                if tmp1[i] != tmp2[i]:
-                    print(str(tmp1[i]) + ' - ' + str(tmp2[i]))
             _, accuracy = model.evaluate(testX, testY, batch_size=batch_size, verbose=0)
         else:
             pickle.dump(model, open('nns_model_pkl', 'wb'))
@@ -150,21 +253,26 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
     if type == 'u':
         model, batch_size = unsupervised_lstm_autoencoder(trainX, trainY, valX, valY)
         if test:
+            pred = model.predict(testX, batch_size=batch_size, verbose=0)
+            pred2 = []
+            test2 = []
+            for l in pred:
+                pred2.append(np.argmax(l))
+            for l in testY:
+                test2.append(np.argmax(l))
+            testmatrix = testmatrix + test2
+            predmatrix = predmatrix + pred2
             _, accuracy = model.evaluate(testX, testY, batch_size=batch_size, verbose=0)
         else:
             pickle.dump(model, open('nnu_model_pkl', 'wb'))
 
     if type == 'k':
-        cluster_amount = 9
-        model = KMedoids(n_clusters=cluster_amount, metric=functions.DTW)
         samples, x , y = trainX.shape
         d2_trainX = trainX.reshape((samples, x * y))
         samples, x , y = testX.shape        
         d2_testX = testX.reshape((samples, x * y))
-        # visualizer = KElbowVisualizer(model, k=(1,10))
-        # visualizer.fit(d2_trainX)
-        # visualizer.show()
-        model.fit(d2_trainX)
+        model, cluster_amount = kmeoids_dtw(d2_trainX)
+
         cluster_distribution = {i: [] for i in range(cluster_amount)}
         cluster_labels = []
         predY = model.predict(d2_testX)
@@ -177,7 +285,6 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
             print('Completeness score: %.3f' % completeness_score(roundedY, predY))
             print(predY)
             print(roundedY)
-        # fig.suptitle('Clouster label distribution')
         for i in range(cluster_amount):
             counted = Counter(cluster_distribution[i])
             cluster_labels.append(counted.most_common(1)[0][0])
@@ -194,28 +301,40 @@ def eval_model(type, trainX, trainY, testX, testY, test=True):
             pickle.dump(model, open('km_model_pkl', 'wb'))
             pickle.dump(cluster_labels, open('km_labels_pkl', 'wb'))
 
-    return accuracy
+    return accuracy, testmatrix, predmatrix
 
 
 def result(scores):
+    """**Prepares and prints statistics of the classification**
+    """
     print(scores)
     m, s = np.mean(scores), np.std(scores)
     print('Accuracy: %.3f%% (+/-%.3f)' % (m, s))
 
 
-def train(repeats=10):
-    # load_file('../data/Move_1_001.csv')
+def train(repeats=20):
+    """**Trains a specified model which is either saved of tested**
+    Parameters:
+
+    1. **repeats** - (int) says how many times the model should be tested
+    """
     dataset = get_files()
     trainX, trainY, testX, testY = prepare_data(dataset)
     scores = list()
+    testmatrix = []
+    predmatrix = []
     if len(sys.argv) == 2:
-        _ = eval_model(str(sys.argv[1]), trainX, trainY, testX, testY, False)
-    elif len(sys.argv) == 3 and str(sys.argv[2]) == 't':
+        _ = build_model(str(sys.argv[1]), trainX, trainY, testX, testY, 100, False)
+    elif len(sys.argv) == 3 and str(sys.argv[2]) == 't': 
         for i in tf.range(repeats):
-            score = eval_model(str(sys.argv[1]), trainX, trainY, testX, testY)
+            score, testmatrix, predmatrix = build_model(str(sys.argv[1]), trainX, trainY, testX, testY, testmatrix, predmatrix)
             score = score * 100.0
             print('>#%d: % .3f' % (i + 1, score))
             scores.append(score)
+            trainX, trainY, testX, testY = prepare_data(dataset, i + 1)
+        cm = confusion_matrix(testmatrix, predmatrix)
+        cm_display = ConfusionMatrixDisplay(cm).plot()
+        plt.savefig('nnu_matrix.png')
         result(scores)
     else:
         print('Wrong arguments passed. First argument: "s" (supervised NN) "u" (unsupervised NN) "k" (kmeans)' +

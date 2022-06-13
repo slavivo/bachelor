@@ -1,3 +1,5 @@
+# === Performs communication with sensor and classification model ===
+
 from os import path, getcwd
 from queue import Queue
 from threading import Event
@@ -22,6 +24,8 @@ arg_parser.parse([])
 options = arg_parser.get_options()
 
 def main(queue, event):
+    """**Takes data from sensor and shares it with classification thread through queue, also stores all data on disk**
+    """
     ss = ScriptStopper()
     while(True):
         try:

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>device_send.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>device_send.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      <h3><span id="performs-communication-with-sensor-and-classification-model" href="performs-communication-with-sensor-and-classification-model"> Performs communication with sensor and classification model </span></h3>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">path</span><span class="p">,</span> <span class="n">getcwd</span>
+<span class="kn">from</span> <span class="nn">queue</span> <span class="kn">import</span> <span class="n">Queue</span>
+<span class="kn">from</span> <span class="nn">threading</span> <span class="kn">import</span> <span class="n">Event</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">sleep</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="n">THIS_DIR</span> <span class="o">=</span> <span class="n">getcwd</span><span class="p">()</span>
+<span class="n">MODBUS_API_DIR</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">THIS_DIR</span><span class="p">,</span> <span class="s1">&#39;modbus_api&#39;</span><span class="p">))</span>
+<span class="n">DEVICE_API_DIR</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">THIS_DIR</span><span class="p">,</span> <span class="s1">&#39;device_api&#39;</span><span class="p">))</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">MODBUS_API_DIR</span><span class="p">)</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DEVICE_API_DIR</span><span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">device_api.Argument_Parser</span> <span class="kn">import</span> <span class="n">Device_Log_Arg_Parser</span>
+<span class="kn">from</span> <span class="nn">modbus_api.Modbus_Handler</span> <span class="kn">import</span> <span class="n">Modbus_Handler_Serial_RTU</span><span class="p">,</span><span class="n">Modbus_Handler_TCPIP</span>
+<span class="kn">from</span> <span class="nn">modbus_api.Modbus_Registers_Exceptions</span> <span class="kn">import</span> <span class="n">ModbusRequestFailedException</span>
+<span class="kn">from</span> <span class="nn">device_api.Device_Database</span> <span class="kn">import</span> <span class="n">find_device</span><span class="p">,</span><span class="n">look_for_device_in_db</span>
+<span class="kn">from</span> <span class="nn">device_api.Logger</span> <span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">from</span> <span class="nn">script_stopper</span> <span class="kn">import</span> <span class="n">ScriptStopper</span>
+
+<span class="n">arg_parser</span> <span class="o">=</span> <span class="n">Device_Log_Arg_Parser</span><span class="p">()</span>
+<span class="n">arg_parser</span><span class="o">.</span><span class="n">parse</span><span class="p">([])</span>
+<span class="n">options</span> <span class="o">=</span> <span class="n">arg_parser</span><span class="o">.</span><span class="n">get_options</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p><strong>Takes data from sensor and shares it with classification thread through queue, also stores all data on disk</strong></p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">main</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">ss</span> <span class="o">=</span> <span class="n">ScriptStopper</span><span class="p">()</span>
+    <span class="k">while</span><span class="p">(</span><span class="bp">True</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">ip_address</span><span class="p">):</span>
+                <span class="n">modbus</span> <span class="o">=</span> <span class="n">Modbus_Handler_TCPIP</span><span class="p">(</span><span class="n">slave_ids</span><span class="o">=</span><span class="p">[</span><span class="n">options</span><span class="o">.</span><span class="n">slave_address</span><span class="p">],</span><span class="n">ip_address</span><span class="o">=</span><span class="n">options</span><span class="o">.</span><span class="n">ip_address</span><span class="p">,</span><span class="n">port</span><span class="o">=</span><span class="mi">80</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">modbus</span> <span class="o">=</span> <span class="n">Modbus_Handler_Serial_RTU</span><span class="p">(</span><span class="n">slave_ids</span><span class="o">=</span><span class="p">[</span><span class="n">options</span><span class="o">.</span><span class="n">slave_address</span><span class="p">],</span><span class="n">port</span><span class="o">=</span><span class="n">options</span><span class="o">.</span><span class="n">serial_port</span><span class="p">)</span>
+            <span class="n">dev</span> <span class="o">=</span> <span class="n">find_device</span><span class="p">(</span><span class="n">modbus</span><span class="p">,</span><span class="n">options</span><span class="o">.</span><span class="n">slave_address</span><span class="p">)</span>
+            <span class="n">look_for_device_in_db</span><span class="p">(</span><span class="n">dev</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">uid</span><span class="p">)</span>
+            <span class="n">dev</span><span class="o">.</span><span class="n">print_info</span><span class="p">()</span>
+            <span class="n">logger</span> <span class="o">=</span> <span class="n">Logger</span><span class="p">(</span><span class="n">dev</span><span class="o">.</span><span class="n">get_data_type</span><span class="p">())</span>
+            <span class="k">while</span><span class="p">(</span><span class="bp">True</span><span class="p">):</span>
+                <span class="n">dev</span><span class="o">.</span><span class="n">read_data</span><span class="p">(</span><span class="bp">True</span><span class="p">,</span><span class="n">options</span><span class="o">.</span><span class="n">pc_synch</span><span class="p">)</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">write_data</span><span class="p">(</span><span class="n">dev</span><span class="o">.</span><span class="n">get_data</span><span class="p">())</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">write_queue</span><span class="p">(</span><span class="n">queue</span><span class="p">)</span>
+                <span class="k">if</span><span class="p">(</span><span class="n">ss</span><span class="o">.</span><span class="n">script_stopped</span><span class="p">()):</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">write_queue</span><span class="p">(</span><span class="n">queue</span><span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">write_file</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">output_file_name</span><span class="p">)</span>
+                    <span class="n">event</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+                    <span class="n">ss</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+                    <span class="nb">exit</span><span class="p">()</span>
+                <span class="k">if</span><span class="p">(</span><span class="n">queue</span><span class="o">.</span><span class="n">qsize</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">15</span><span class="p">):</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">write_queue</span><span class="p">(</span><span class="n">queue</span><span class="p">)</span>
+                    <span class="k">print</span><span class="p">(</span><span class="s2">&quot;Classification is behind data collection. Waiting 1s.&quot;</span><span class="p">)</span>
+                    <span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+                <span class="k">if</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">is_set</span><span class="p">()):</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">write_file</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">output_file_name</span><span class="p">)</span>
+                    <span class="n">ss</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+                    <span class="nb">exit</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">write_queue</span><span class="p">(</span><span class="n">queue</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">write_file</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">output_file_name</span><span class="p">)</span>
+            <span class="n">event</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+            <span class="nb">exit</span><span class="p">()</span>
+        <span class="k">except</span> <span class="n">ModbusRequestFailedException</span><span class="p">:</span>
+            <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Connection Error, reconnecting...&#39;</span><span class="p">)</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>
