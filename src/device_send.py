@@ -1,8 +1,6 @@
 # === Performs communication with sensor and classification model ===
 
 from os import path, getcwd
-from queue import Queue
-from threading import Event
 from time import sleep
 import sys
 

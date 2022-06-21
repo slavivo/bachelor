@@ -26,8 +26,8 @@ import pickle
 pd.options.mode.chained_assignment = None
 import absl.logging
 absl.logging.set_verbosity(absl.logging.ERROR)
-import functions
-import classifier_class
+from functions import *
+from classifier_class import *
 
 def get_files():
     """**Returns files from a specified directory**
