@@ -33,7 +33,6 @@
 <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">DEVICE_API_DIR</span><span class="p">)</span>
 <span class="kn">import</span> <span class="nn">device_send</span>
 <span class="kn">import</span> <span class="nn">functions</span>
-<span class="kn">import</span> <span class="nn">classifier_class</span>
 <span class="kn">import</span> <span class="nn">pickle</span>
 <span class="n">pd</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">mode</span><span class="o">.</span><span class="n">chained_assignment</span> <span class="o">=</span> <span class="bp">None</span></pre></div>
     </div>
@@ -68,31 +67,20 @@
     <span class="n">queue</span> <span class="o">=</span> <span class="n">Queue</span><span class="p">()</span>
     <span class="n">event</span> <span class="o">=</span> <span class="n">Event</span><span class="p">()</span>
     <span class="n">t</span> <span class="o">=</span> <span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">device_send</span><span class="o">.</span><span class="n">main</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">queue</span><span class="p">,</span> <span class="n">event</span><span class="p">))</span>
+    <span class="n">duration</span> <span class="o">=</span> <span class="n">classifier</span><span class="o">.</span><span class="n">duration</span>
     <span class="n">t</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
     <span class="k">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">---Beginning real-time classfication---</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
     <span class="k">while</span><span class="p">(</span><span class="bp">True</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">queue</span><span class="o">.</span><span class="n">empty</span><span class="p">():</span>
                 <span class="n">df_tmp</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
-                <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">df_tmp</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-3'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-3'>#</a>
-      </div>
-      <p>print(&lsquo;Queue size:&rsquo;, queue.qsize())
-print(&lsquo;&mdash;Main thread df&mdash;\n&rsquo;, df.head(2), df.tail(2), &lsquo;\n Shape:&rsquo;, df.shape[0])</p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">is_set</span><span class="p">()</span> <span class="ow">and</span> <span class="n">queue</span><span class="o">.</span><span class="n">empty</span><span class="p">():</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">df_tmp</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">event</span><span class="o">.</span><span class="n">is_set</span><span class="p">()</span> <span class="ow">and</span> <span class="n">queue</span><span class="o">.</span><span class="n">empty</span><span class="p">():</span>
                 <span class="k">break</span>
-            <span class="k">if</span> <span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">600</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">df</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">duration</span> <span class="o">*</span> <span class="mi">120</span><span class="p">:</span>
                 <span class="n">df_tmp</span> <span class="o">=</span> <span class="n">df</span><span class="p">[[</span><span class="s1">&#39;time_ms&#39;</span><span class="p">,</span> <span class="s1">&#39;accelaration_aX_g&#39;</span><span class="p">,</span> <span class="s1">&#39;accelaration_aY_g&#39;</span><span class="p">,</span> <span class="s1">&#39;accelaration_aZ_g&#39;</span><span class="p">,</span> <span class="s1">&#39;gyroscope_aX_mdps&#39;</span><span class="p">,</span>
                 <span class="s1">&#39;gyroscope_aY_mdps&#39;</span><span class="p">,</span> <span class="s1">&#39;gyroscope_aZ_mdps&#39;</span><span class="p">,</span> <span class="s1">&#39;magnetometer_aX_mT&#39;</span><span class="p">,</span> <span class="s1">&#39;magnetometer_aY_mT&#39;</span><span class="p">,</span> <span class="s1">&#39;magnetometer_aZ_mT&#39;</span><span class="p">]]</span>
-                <span class="n">df_tmp</span><span class="p">,</span> <span class="n">index</span> <span class="o">=</span> <span class="n">functions</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="n">df_tmp</span><span class="p">)</span>
+                <span class="n">df_tmp</span><span class="p">,</span> <span class="n">index</span> <span class="o">=</span> <span class="n">classifier</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="n">df_tmp</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">df_tmp</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
                     <span class="k">print</span><span class="p">(</span><span class="s1">&#39;Wrong format of input data from sensor.&#39;</span><span class="p">)</span>
                     <span class="k">continue</span>
@@ -101,11 +89,23 @@ print(&lsquo;&mdash;Main thread df&mdash;\n&rsquo;, df.head(2), df.tail(2), &lsq
                     <span class="n">data</span> <span class="o">=</span> <span class="n">scaler</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
                 <span class="n">classifier</span><span class="o">.</span><span class="n">predict_2D</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">counter</span><span class="p">)</span>
                 <span class="n">counter</span> <span class="o">+=</span> <span class="mi">1</span>
-                <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="mi">250</span><span class="p">:]</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">iloc</span><span class="p">[(</span><span class="nb">int</span><span class="p">)</span> <span class="p">(</span><span class="n">duration</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="mi">100</span><span class="p">):]</span>
         <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
             <span class="n">event</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
             <span class="n">t</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
             <span class="nb">exit</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p><strong>Reads whole .csv file into a np array</strong></p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">load_file</span><span class="p">(</span><span class="nb">file</span><span class="p">,</span> <span class="n">classifier</span><span class="p">):</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
@@ -114,21 +114,10 @@ print(&lsquo;&mdash;Main thread df&mdash;\n&rsquo;, df.head(2), df.tail(2), &lsq
       <div class='octowrap'>
         <a class='octothorpe' href='#section-4'>#</a>
       </div>
-      <p><strong>Reads whole .csv file into a np array</strong></p>
-    </div>
-    <div class='code'>
-      <div class="highlight"><pre><span class="k">def</span> <span class="nf">load_file</span><span class="p">(</span><span class="nb">file</span><span class="p">):</span></pre></div>
-    </div>
-  </div>
-  <div class='clearall'></div>
-  <div class='section' id='section-5'>
-    <div class='docs'>
-      <div class='octowrap'>
-        <a class='octothorpe' href='#section-5'>#</a>
-      </div>
       <p>Parameters:</p>
 <ol>
 <li><strong>file</strong> - (str) path to file</li>
+<li><strong>classifier</strong> - (Classifier) classification model</li>
 </ol>
 <p>Returns:</p>
 <ol>
@@ -147,7 +136,7 @@ print(&lsquo;&mdash;Main thread df&mdash;\n&rsquo;, df.head(2), df.tail(2), &lsq
         <span class="k">print</span><span class="p">(</span><span class="s1">&#39;File does not exist&#39;</span><span class="p">)</span>
         <span class="k">return</span>
     <span class="k">while</span><span class="p">(</span><span class="bp">True</span><span class="p">):</span>
-        <span class="n">tmp</span><span class="p">,</span> <span class="n">index</span> <span class="o">=</span> <span class="n">functions</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="n">tmp</span><span class="p">,</span> <span class="n">index</span> <span class="o">=</span> <span class="n">classifier</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">tmp</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
             <span class="k">break</span>
         <span class="n">loaded</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tmp</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span>
@@ -161,10 +150,10 @@ print(&lsquo;&mdash;Main thread df&mdash;\n&rsquo;, df.head(2), df.tail(2), &lsq
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-6'>
+  <div class='section' id='section-5'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-6'>#</a>
+        <a class='octothorpe' href='#section-5'>#</a>
       </div>
       <p><strong>Performs classification on specified file</strong></p>
     </div>
@@ -173,10 +162,10 @@ print(&lsquo;&mdash;Main thread df&mdash;\n&rsquo;, df.head(2), df.tail(2), &lsq
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-7'>
+  <div class='section' id='section-6'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-7'>#</a>
+        <a class='octothorpe' href='#section-6'>#</a>
       </div>
       <p>Parameters:</p>
 <ol>
@@ -186,17 +175,17 @@ print(&lsquo;&mdash;Main thread df&mdash;\n&rsquo;, df.head(2), df.tail(2), &lsq
 </ol>
     </div>
     <div class='code'>
-      <div class="highlight"><pre>    <span class="n">data</span> <span class="o">=</span> <span class="n">load_file</span><span class="p">(</span><span class="n">input_file</span><span class="p">)</span>
+      <div class="highlight"><pre>    <span class="n">data</span> <span class="o">=</span> <span class="n">load_file</span><span class="p">(</span><span class="n">input_file</span><span class="p">,</span> <span class="n">classifier</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">scaler</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">:</span>
         <span class="n">data</span> <span class="o">=</span> <span class="n">functions</span><span class="o">.</span><span class="n">scale</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">scaler</span><span class="p">)</span>
     <span class="n">classifier</span><span class="o">.</span><span class="n">predict_3D</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></pre></div>
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-8'>
+  <div class='section' id='section-7'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-8'>#</a>
+        <a class='octothorpe' href='#section-7'>#</a>
       </div>
       <p><strong>Prints message in case of invalid args</strong></p>
     </div>
@@ -205,10 +194,10 @@ print(&lsquo;&mdash;Main thread df&mdash;\n&rsquo;, df.head(2), df.tail(2), &lsq
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-9'>
+  <div class='section' id='section-8'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-9'>#</a>
+        <a class='octothorpe' href='#section-8'>#</a>
       </div>
       
     </div>
@@ -217,10 +206,10 @@ print(&lsquo;&mdash;Main thread df&mdash;\n&rsquo;, df.head(2), df.tail(2), &lsq
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-10'>
+  <div class='section' id='section-9'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-10'>#</a>
+        <a class='octothorpe' href='#section-9'>#</a>
       </div>
       <p><strong>Performs real-time or file classification</strong></p>
     </div>
@@ -229,10 +218,10 @@ print(&lsquo;&mdash;Main thread df&mdash;\n&rsquo;, df.head(2), df.tail(2), &lsq
     </div>
   </div>
   <div class='clearall'></div>
-  <div class='section' id='section-11'>
+  <div class='section' id='section-10'>
     <div class='docs'>
       <div class='octowrap'>
-        <a class='octothorpe' href='#section-11'>#</a>
+        <a class='octothorpe' href='#section-10'>#</a>
       </div>
       
     </div>
@@ -242,15 +231,11 @@ print(&lsquo;&mdash;Main thread df&mdash;\n&rsquo;, df.head(2), df.tail(2), &lsq
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
         <span class="n">x</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
         <span class="k">if</span> <span class="n">x</span> <span class="o">==</span> <span class="s1">&#39;s&#39;</span><span class="p">:</span>
-            <span class="n">model</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s1">&#39;nns_model_pkl&#39;</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">))</span>
-            <span class="n">classifier</span> <span class="o">=</span> <span class="n">classifier_class</span><span class="o">.</span><span class="n">Classifier</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s1">&#39;snn&#39;</span><span class="p">)</span>
+            <span class="n">classifier</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s1">&#39;nns_model_pkl&#39;</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">))</span>
         <span class="k">elif</span> <span class="n">x</span> <span class="o">==</span> <span class="s1">&#39;u&#39;</span><span class="p">:</span>
-            <span class="n">model</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s1">&#39;nnu_model_pkl&#39;</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">))</span>
-            <span class="n">classifier</span> <span class="o">=</span> <span class="n">classifier_class</span><span class="o">.</span><span class="n">Classifier</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s1">&#39;unn&#39;</span><span class="p">)</span>
+            <span class="n">classifier</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s1">&#39;nnu_model_pkl&#39;</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">))</span>
         <span class="k">elif</span> <span class="n">x</span> <span class="o">==</span> <span class="s1">&#39;k&#39;</span><span class="p">:</span>
-            <span class="n">model</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s1">&#39;km_model_pkl&#39;</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">))</span>
-            <span class="n">cluster_labels</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s1">&#39;km_labels_pkl&#39;</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">))</span>
-            <span class="n">classifier</span> <span class="o">=</span> <span class="n">classifier_class</span><span class="o">.</span><span class="n">Classifier</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s1">&#39;kmedoids&#39;</span><span class="p">,</span> <span class="n">cluster_labels</span><span class="p">)</span>
+            <span class="n">classifier</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s1">&#39;km_model_pkl&#39;</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">))</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">wrong_args</span><span class="p">()</span>
             <span class="k">return</span>
