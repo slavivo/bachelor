@@ -7,7 +7,6 @@ import tensorflow as tf
 import pandas as pd
 import re
 from keras.models import Sequential
-from keras.models import Model
 from keras.layers import Dense
 from keras.layers import LSTM
 from keras.layers import Dropout
@@ -15,14 +14,11 @@ from keras.layers import Bidirectional
 from keras.layers import RepeatVector
 from keras.layers import TimeDistributed
 from keras import callbacks
-from sklearn.metrics.cluster import completeness_score
-from sklearn.model_selection import GridSearchCV
 from sklearn_extra.cluster import KMedoids
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import ConfusionMatrixDisplay
-from yellowbrick.cluster import SilhouetteVisualizer
+from sklearn.decomposition import PCA
+from tslearn.metrics import dtw
 from yellowbrick.cluster import KElbowVisualizer
 import matplotlib.pyplot as plt
 import sys
@@ -31,6 +27,7 @@ pd.options.mode.chained_assignment = None
 import absl.logging
 absl.logging.set_verbosity(absl.logging.ERROR)
 import functions
+import classifier_class
 
 def get_files():
     """**Returns files from a specified directory**
@@ -38,11 +35,12 @@ def get_files():
     return glob.glob('../data/*')
 
 
-def load_file(file):
+def load_file(file, type):
     """**Reads one interval from a .csv file**
     Parameters:
 
     1. **file** - (str) path to file
+    2. **type** - (str) type of classifier
 
     Returns:
 
@@ -56,7 +54,12 @@ def load_file(file):
     N = int(df.shape[0] / 2)
     df = df.iloc[N:]
     df = df.reset_index(drop=True)
-    df, _ = functions.resample(df)
+    if type == 'k':
+        df, _ = functions.resample(df, 4)
+    elif (type == 's'):
+        df, _ = functions.resample(df, 5)
+    else:
+        df, _ = functions.resample(df, 4)
     if df.empty:
         print('Wrong format of file: ', file)
         return None
@@ -79,12 +82,13 @@ def flatten(x):
     return flatX
 
 
-def prepare_data(files, i=1):
+def prepare_data(files, type, i=1):
     """**Reads and prepares data from files**
     Parameters:
 
     1. **files** - (list) list of files
-    2. **i** - (int) can be set to change random_state of train_test_split
+    2. **type** - (str) type of classifier
+    3. **i** - (int) can be set to change random_state of train_test_split
 
     Returns:
 
@@ -97,7 +101,7 @@ def prepare_data(files, i=1):
     labels = list()
     label_classes = tf.constant(['Move_1', 'Move_2', 'Move_3', 'Move_4', 'Move_5', 'Move_6', 'Move_7', 'Move_8', 'Move_9'])
     for file in files:
-        data = load_file(file)
+        data = load_file(file, type)
         if data is None:
             continue
         loaded.append(data)
@@ -159,14 +163,12 @@ def unsupervised_lstm_autoencoder(trainX, trainY, valX, valY):
     n_timesteps, n_features, n_outputs = trainX.shape[1], trainX.shape[2], trainY.shape[1]
 
     model = Sequential()
-    model.add(LSTM(units=250, input_shape=(n_timesteps, n_features), return_sequences=True))
-    model.add(LSTM(units=250, input_shape=(n_timesteps, n_features), return_sequences=True))
-    model.add(LSTM(units=250, input_shape=(n_timesteps, n_features)))
+    model.add(LSTM(units=150, input_shape=(n_timesteps, n_features), return_sequences=True))
+    model.add(LSTM(units=150, input_shape=(n_timesteps, n_features)))
     model.add(Dropout(0.5))
     model.add(RepeatVector(n_timesteps))
-    model.add(LSTM(units=250, return_sequences=True))
-    model.add(LSTM(units=250, return_sequences=True))
-    model.add(LSTM(units=250, return_sequences=True))
+    model.add(LSTM(units=150, return_sequences=True))
+    model.add(LSTM(units=150, return_sequences=True))
     model.add(Dropout(0.5))
     model.add(TimeDistributed(Dense(n_features)))
     model.compile(loss='mae', optimizer='adam')
@@ -176,13 +178,11 @@ def unsupervised_lstm_autoencoder(trainX, trainY, valX, valY):
     model.fit(trainX, trainX, epochs=epochs, batch_size=batch_size, verbose=verbose, validation_data=(valX, valX), callbacks=[earlystopping])
 
     model2 = Sequential()
-    model2.add(LSTM(units=250, input_shape=(n_timesteps, n_features), return_sequences=True, weights=model.layers[0].get_weights()))
-    model2.add(LSTM(units=250, input_shape=(n_timesteps, n_features), return_sequences=True, weights=model.layers[1].get_weights()))
-    model2.add(LSTM(units=250, input_shape=(n_timesteps, n_features), weights=model.layers[2].get_weights()))
+    model2.add(LSTM(units=150, input_shape=(n_timesteps, n_features), return_sequences=True, weights=model.layers[0].get_weights()))
+    model2.add(LSTM(units=150, input_shape=(n_timesteps, n_features), weights=model.layers[1].get_weights()))
     model2.add(Dense(n_outputs, activation='softmax'))
     model2.layers[0].trainable = False
     model2.layers[1].trainable = False
-    model2.layers[2].trainable = False
     model2.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
 
     earlystopping = callbacks.EarlyStopping(monitor='val_loss', mode='min', patience=20, restore_best_weights=True)
@@ -202,18 +202,17 @@ def kmeoids_dtw(d2_trainX):
     1. **model** - classification model
     2. **cluster_amount** - (int) amount of clusters
     """
-    model = KMedoids(n_clusters=8, metric=functions.DTW, random_state=10)
+    model = KMedoids(n_clusters=8, metric=dtw, random_state=10)
     
-    visualizer = KElbowVisualizer(model, k=(6,11), metric='calinski_harabasz', timings=False)
+    visualizer = KElbowVisualizer(model, k=(3,11), metric='distortion', timings=False)
     visualizer.fit(d2_trainX)
-    visualizer.show()
     cluster_amount = visualizer.elbow_value_
-    model = KMedoids(n_clusters=cluster_amount, metric=functions.DTW, random_state=10)
+    model = KMedoids(n_clusters=cluster_amount, metric=dtw, random_state=10)
     model.fit(d2_trainX)
     return model, cluster_amount
 
 
-def build_model(type, trainX, trainY, testX, testY, testmatrix=None, predmatrix=None, test=True):
+def build_model(type, trainX, trainY, testX, testY, test=True):
     """**Builds a specified model and then either tests it or saves it**
     Parameters:
 
@@ -239,7 +238,6 @@ def build_model(type, trainX, trainY, testX, testY, testmatrix=None, predmatrix=
         trainX, valX, trainY, valY = train_test_split(trainX, trainY, test_size=0.3)
     else:
         testX, valX, testY, valY = train_test_split(testX, testY, test_size=0.25)
-        print('Number of sample in training dataset: ', len(trainX), ' In validation dataset: ', len(valX), ' In testing dataset: ', len(testX))
     
     accuracy = 0
 
@@ -248,29 +246,27 @@ def build_model(type, trainX, trainY, testX, testY, testmatrix=None, predmatrix=
         if test:
             _, accuracy = model.evaluate(testX, testY, batch_size=batch_size, verbose=0)
         else:
-            pickle.dump(model, open('nns_model_pkl', 'wb'))
+            classifier = classifier_class.Classifier(model, 'snn', 5)
+            pickle.dump(classifier, open('nns_model_pkl', 'wb'))
 
     if type == 'u':
         model, batch_size = unsupervised_lstm_autoencoder(trainX, trainY, valX, valY)
         if test:
-            pred = model.predict(testX, batch_size=batch_size, verbose=0)
-            pred2 = []
-            test2 = []
-            for l in pred:
-                pred2.append(np.argmax(l))
-            for l in testY:
-                test2.append(np.argmax(l))
-            testmatrix = testmatrix + test2
-            predmatrix = predmatrix + pred2
             _, accuracy = model.evaluate(testX, testY, batch_size=batch_size, verbose=0)
         else:
-            pickle.dump(model, open('nnu_model_pkl', 'wb'))
+            classifier = classifier_class.Classifier(model, 'unn', 4)
+            pickle.dump(classifier, open('nnu_model_pkl', 'wb'))
 
     if type == 'k':
         samples, x , y = trainX.shape
         d2_trainX = trainX.reshape((samples, x * y))
         samples, x , y = testX.shape        
         d2_testX = testX.reshape((samples, x * y))
+
+        pca = PCA(.80)
+        d2_trainX = pca.fit_transform(d2_trainX)
+        d2_testX = pca.transform(d2_testX)
+
         model, cluster_amount = kmeoids_dtw(d2_trainX)
 
         cluster_distribution = {i: [] for i in range(cluster_amount)}
@@ -280,11 +276,7 @@ def build_model(type, trainX, trainY, testX, testY, testmatrix=None, predmatrix=
         for i in range(len(predY)):
             cluster_distribution[predY[i]].append(roundedY[i])
         if test:
-            print(cluster_distribution)
             fig, axes = plt.subplots(cluster_amount)
-            print('Completeness score: %.3f' % completeness_score(roundedY, predY))
-            print(predY)
-            print(roundedY)
         for i in range(cluster_amount):
             counted = Counter(cluster_distribution[i])
             cluster_labels.append(counted.most_common(1)[0][0])
@@ -294,14 +286,22 @@ def build_model(type, trainX, trainY, testX, testY, testmatrix=None, predmatrix=
                 axes[i].pie(val_list, labels=key_list, startangle=90, radius=1800)
                 axes[i].set_title('Distribution of cluster ' + str(i + 1), fontsize=12)
                 axes[i].axis('equal')
-        print(cluster_labels)
+        correct = 0
+        false = 0
+        for i in range(len(predY)):
+            true_label = cluster_labels[predY[i]]
+            if true_label != roundedY[i]:
+                false = false + 1
+            else:
+                correct = correct + 1
+        accuracy = correct / (correct + false)
         if test:
             plt.show()
         else:
-            pickle.dump(model, open('km_model_pkl', 'wb'))
-            pickle.dump(cluster_labels, open('km_labels_pkl', 'wb'))
+            classifier = classifier_class.Classifier(model, 'kmedoids', 5, cluster_labels, pca)
+            pickle.dump(classifier, open('km_model_pkl', 'wb'))
 
-    return accuracy, testmatrix, predmatrix
+    return accuracy
 
 
 def result(scores):
@@ -318,23 +318,20 @@ def train(repeats=20):
 
     1. **repeats** - (int) says how many times the model should be tested
     """
-    dataset = get_files()
-    trainX, trainY, testX, testY = prepare_data(dataset)
     scores = list()
-    testmatrix = []
-    predmatrix = []
     if len(sys.argv) == 2:
-        _ = build_model(str(sys.argv[1]), trainX, trainY, testX, testY, 100, False)
+        dataset = get_files()
+        trainX, trainY, testX, testY = prepare_data(dataset, str(sys.argv[1]))
+        _ = build_model(str(sys.argv[1]), trainX, trainY, testX, testY, False)
     elif len(sys.argv) == 3 and str(sys.argv[2]) == 't': 
+        dataset = get_files()
+        trainX, trainY, testX, testY = prepare_data(dataset, str(sys.argv[1]))
         for i in tf.range(repeats):
-            score, testmatrix, predmatrix = build_model(str(sys.argv[1]), trainX, trainY, testX, testY, testmatrix, predmatrix)
+            score = build_model(str(sys.argv[1]), trainX, trainY, testX, testY)
             score = score * 100.0
             print('>#%d: % .3f' % (i + 1, score))
             scores.append(score)
-            trainX, trainY, testX, testY = prepare_data(dataset, i + 1)
-        cm = confusion_matrix(testmatrix, predmatrix)
-        cm_display = ConfusionMatrixDisplay(cm).plot()
-        plt.savefig('nnu_matrix.png')
+            trainX, trainY, testX, testY = prepare_data(dataset, str(sys.argv[1]), i + 1)
         result(scores)
     else:
         print('Wrong arguments passed. First argument: "s" (supervised NN) "u" (unsupervised NN) "k" (kmeans)' +

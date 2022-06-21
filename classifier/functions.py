@@ -5,18 +5,19 @@ import pandas as pd
 from scipy.spatial import distance
 
 
-def resample(df):
+def resample(df, duration=6, frequency=10):
     """**Cuts off first n seconds of dataframe and resamples it**
     Parameters:
 
     1. **df** - (dataframe) data of movement
+    2. **duration** - (int) duration of movement inverval in s
+    3. **frequency** - (int) desired frequency in Hz
     
     Returns:
 
     1. **df_tmp** - (dataframe) new data of movement
     2. **index** - (int) number of the line at which dataframe was cut off
     """
-    duration = 5 # duration of the sample in seconds
     time = df['time_ms']
     start = time[0]
     end = start + 1000 * duration
@@ -32,10 +33,10 @@ def resample(df):
     df_tmp.index = df_tmp['time_ms'].astype('datetime64[ms]')
     df_tmp = df_tmp.resample('1ms').last()
     df_tmp = df_tmp.interpolate() # linear interpolation
-    df_tmp = df_tmp.resample('100ms').mean()
-    if df_tmp.shape[0] == duration * 10 + 1:
+    df_tmp = df_tmp.resample(str(int(1000/frequency)) + 'ms').mean()
+    if df_tmp.shape[0] == duration * frequency + 1:
         df_tmp = df_tmp.iloc[1:]
-    df_tmp.index = pd.RangeIndex(start=0, stop=duration*10, step=1)
+    df_tmp.index = pd.RangeIndex(start=0, stop=duration*frequency, step=1)
     df_tmp.drop('time_ms', inplace=True, axis=1)
     return df_tmp, index
 
@@ -58,6 +59,7 @@ def scale(x, scaler):
 
 def DTW(a, b):
     """**Returns temporal distance of two vectors**
+    Note: Function is not used as it is slower than one provided by tslearn
     Parameters:
 
     1. **a** - (np array) vector

@@ -14,7 +14,6 @@ sys.path.append(MODBUS_API_DIR)
 sys.path.append(DEVICE_API_DIR)
 import device_send
 import functions
-import classifier_class
 import pickle
 pd.options.mode.chained_assignment = None
 
@@ -30,6 +29,7 @@ def real_time_eval(classifier, scaler):
     queue = Queue()
     event = Event()
     t = Thread(target=device_send.main, args=(queue, event))
+    duration = classifier.duration
     t.start()
     print('\n---Beginning real-time classfication---\n')
     while(True):
@@ -39,10 +39,10 @@ def real_time_eval(classifier, scaler):
                 df = df.append(df_tmp, ignore_index=True)
             if event.is_set() and queue.empty():
                 break
-            if df.shape[0] > 600:
+            if df.shape[0] > duration * 120:
                 df_tmp = df[['time_ms', 'accelaration_aX_g', 'accelaration_aY_g', 'accelaration_aZ_g', 'gyroscope_aX_mdps',
                 'gyroscope_aY_mdps', 'gyroscope_aZ_mdps', 'magnetometer_aX_mT', 'magnetometer_aY_mT', 'magnetometer_aZ_mT']]
-                df_tmp, index = functions.resample(df_tmp)
+                df_tmp, index = classifier.resample(df_tmp)
                 if df_tmp.empty:
                     print('Wrong format of input data from sensor.')
                     continue
@@ -51,17 +51,18 @@ def real_time_eval(classifier, scaler):
                     data = scaler.transform(data)
                 classifier.predict_2D(data, counter)
                 counter += 1
-                df = df.iloc[250:]
+                df = df.iloc[(int) (duration / 2 * 100):]
         except KeyboardInterrupt:
             event.set()
             t.join()
             exit()
 
-def load_file(file):
+def load_file(file, classifier):
     """**Reads whole .csv file into a np array**
     Parameters:
 
     1. **file** - (str) path to file
+    2. **classifier** - (Classifier) classification model
 
     Returns:
 
@@ -78,7 +79,7 @@ def load_file(file):
         print('File does not exist')
         return
     while(True):
-        tmp, index = functions.resample(df)
+        tmp, index = classifier.resample(df)
         if tmp.empty:
             break
         loaded.append(tmp.to_numpy())
@@ -99,7 +100,7 @@ def eval_from_file(classifier, input_file, scaler):
     2. **input_file** - (str) path to file
     3. **scaler** -  scaler usable on 2D data
     """
-    data = load_file(input_file)
+    data = load_file(input_file, classifier)
     if scaler != None:
         data = functions.scale(data, scaler)
     classifier.predict_3D(data, 1)
@@ -117,15 +118,11 @@ def classify():
     if len(sys.argv) > 1:
         x = str(sys.argv[1])
         if x == 's':
-            model = pickle.load(open('nns_model_pkl', 'rb'))
-            classifier = classifier_class.Classifier(model, 'snn')
+            classifier = pickle.load(open('nns_model_pkl', 'rb'))
         elif x == 'u':
-            model = pickle.load(open('nnu_model_pkl', 'rb'))
-            classifier = classifier_class.Classifier(model, 'unn')
+            classifier = pickle.load(open('nnu_model_pkl', 'rb'))
         elif x == 'k':
-            model = pickle.load(open('km_model_pkl', 'rb'))
-            cluster_labels = pickle.load(open('km_labels_pkl', 'rb'))
-            classifier = classifier_class.Classifier(model, 'kmedoids', cluster_labels)
+            classifier = pickle.load(open('km_model_pkl', 'rb'))
         else:
             wrong_args()
             return
